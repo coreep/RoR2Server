@@ -7,6 +7,8 @@ services:
       - "${PORT:-27015}:${PORT:-27015}/udp"
       - "${STEAM_QUERY_PORT:-27016}:${STEAM_QUERY_PORT:-27016}/udp"
       - "${STEAM_SERVER_PORT:-27017}:${STEAM_SERVER_PORT:-27017}/udp"
+    volumes:
+      - ./game:/game
     environment:
       - MAX_PLAYERS=${MAX_PLAYERS:-4}
       - STEAM_HEARTBEAT=${STEAM_HEARTBEAT:-1}

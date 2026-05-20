@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY ["game/", "/game/"]
+# COPY ["game/", "/game/"]
 COPY RoR2Patcher/ ./RoR2Patcher/
 COPY config.cfg /app/config.cfg
 

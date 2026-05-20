@@ -8,6 +8,7 @@ PATCHED_DLL="RoR2_Patched.dll"
 CONFIG_DIR="${GAME_DIR}/Risk of Rain 2_Data/Config"
 LOG_PATH="/root/.wine/drive_c/users/root/AppData/LocalLow/Hopoo Games, LLC/Risk of Rain 2/Player.log"
 WINEPREFIX="${WINEPREFIX:-/root/.wine}"
+WINHTTP_DLL_PATH="${GAME_DIR}/winhttp.dll"
 
 XVFB_PID=""
 WINE_PID=""
@@ -40,6 +41,22 @@ init_wine_prefix() {
             exit 1
         fi
     fi
+}
+
+configure_native_winhttp() {
+    if [ ! -f "$WINHTTP_DLL_PATH" ]; then
+        return
+    fi
+
+    echo "Found custom winhttp.dll at $WINHTTP_DLL_PATH, enabling native override"
+    cp -f "$WINHTTP_DLL_PATH" "$WINEPREFIX/drive_c/windows/system32/winhttp.dll"
+
+    if [ -d "$WINEPREFIX/drive_c/windows/syswow64" ]; then
+        cp -f "$WINHTTP_DLL_PATH" "$WINEPREFIX/drive_c/windows/syswow64/winhttp.dll" || true
+    fi
+
+    export WINEDLLOVERRIDES="winhttp=n,b${WINEDLLOVERRIDES:+;$WINEDLLOVERRIDES}"
+    wine reg add "HKCU\\Software\\Wine\\DllOverrides" /v winhttp /d native,builtin /f >/dev/null 2>&1 || true
 }
 
 echo "Risk of Rain 2 Dedicated Server Starting..."
@@ -105,6 +122,7 @@ if [ ! -f "$WINEPREFIX/drive_c/windows/system32/kernel32.dll" ]; then
 fi
 
 init_wine_prefix
+# configure_native_winhttp
 
 cd "$GAME_DIR"
 echo "Starting Risk of Rain 2 Dedicated Server..."

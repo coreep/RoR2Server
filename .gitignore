@@ -3,6 +3,8 @@ RoR2Patcher/bin/
 RoR2Patcher/obj/
 RefCode/
 output/
+game/
+logs*
 
 # Development files
 Dockerfile.dev
