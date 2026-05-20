@@ -7,6 +7,7 @@ BACKUP_PATH="${ROR2_DLL_PATH}.bak"
 PATCHED_DLL="RoR2_Patched.dll"
 CONFIG_DIR="${GAME_DIR}/Risk of Rain 2_Data/Config"
 LOG_PATH="/root/.wine/drive_c/users/root/AppData/LocalLow/Hopoo Games, LLC/Risk of Rain 2/Player.log"
+WINEPREFIX="${WINEPREFIX:-/root/.wine}"
 
 XVFB_PID=""
 WINE_PID=""
@@ -24,6 +25,22 @@ cleanup() {
 }
 
 trap cleanup EXIT
+
+init_wine_prefix() {
+    echo "Initializing Wine prefix at $WINEPREFIX"
+    mkdir -p "$WINEPREFIX"
+
+    if ! wineboot -u >/tmp/wineboot.log 2>&1; then
+        echo "Wine prefix init failed, recreating prefix and retrying..."
+        rm -rf "$WINEPREFIX"
+        mkdir -p "$WINEPREFIX"
+        if ! wineboot -u >/tmp/wineboot.log 2>&1; then
+            echo "ERROR: wineboot failed after retry"
+            sed -n '1,120p' /tmp/wineboot.log
+            exit 1
+        fi
+    fi
+}
 
 echo "Risk of Rain 2 Dedicated Server Starting..."
 
@@ -66,6 +83,7 @@ envsubst < /app/config.cfg > "$CONFIG_DIR/server.cfg"
 export DISPLAY=:99
 Xvfb "$DISPLAY" -screen 0 1024x768x24 &
 XVFB_PID=$!
+export WINEPREFIX
 
 for _ in {1..20}; do
     if [ -S "/tmp/.X11-unix/X99" ]; then
@@ -78,6 +96,13 @@ if [ ! -S "/tmp/.X11-unix/X99" ]; then
     echo "ERROR: Xvfb did not start on DISPLAY $DISPLAY"
     exit 1
 fi
+
+if [ ! -f "$WINEPREFIX/drive_c/windows/system32/kernel32.dll" ]; then
+    echo "Wine prefix is missing kernel32.dll, recreating prefix"
+    rm -rf "$WINEPREFIX"
+fi
+
+init_wine_prefix
 
 cd "$GAME_DIR"
 echo "Starting Risk of Rain 2 Dedicated Server..."
