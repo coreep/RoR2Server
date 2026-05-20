@@ -1,11 +1,29 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 GAME_DIR="/game"
 ROR2_DLL_PATH="${GAME_DIR}/Risk of Rain 2_Data/Managed/RoR2.dll"
 BACKUP_PATH="${ROR2_DLL_PATH}.bak"
 PATCHED_DLL="RoR2_Patched.dll"
 CONFIG_DIR="${GAME_DIR}/Risk of Rain 2_Data/Config"
+LOG_PATH="/root/.wine/drive_c/users/root/AppData/LocalLow/Hopoo Games, LLC/Risk of Rain 2/Player.log"
+
+XVFB_PID=""
+WINE_PID=""
+TAIL_PID=""
+
+cleanup() {
+    if [ -n "${TAIL_PID}" ] && kill -0 "${TAIL_PID}" 2>/dev/null; then
+        kill "${TAIL_PID}" 2>/dev/null || true
+        wait "${TAIL_PID}" 2>/dev/null || true
+    fi
+    if [ -n "${XVFB_PID}" ] && kill -0 "${XVFB_PID}" 2>/dev/null; then
+        kill "${XVFB_PID}" 2>/dev/null || true
+        wait "${XVFB_PID}" 2>/dev/null || true
+    fi
+}
+
+trap cleanup EXIT
 
 echo "Risk of Rain 2 Dedicated Server Starting..."
 
@@ -45,24 +63,33 @@ echo "Processing configuration..."
 mkdir -p "$CONFIG_DIR"
 envsubst < /app/config.cfg > "$CONFIG_DIR/server.cfg"
 
-winecfg
+export DISPLAY=:99
+Xvfb "$DISPLAY" -screen 0 1024x768x24 &
+XVFB_PID=$!
+
+for _ in {1..20}; do
+    if [ -S "/tmp/.X11-unix/X99" ]; then
+        break
+    fi
+    sleep 1
+done
+
+if [ ! -S "/tmp/.X11-unix/X99" ]; then
+    echo "ERROR: Xvfb did not start on DISPLAY $DISPLAY"
+    exit 1
+fi
 
 cd "$GAME_DIR"
 echo "Starting Risk of Rain 2 Dedicated Server..."
-
-export DISPLAY=:99
-Xvfb :99 -screen 0 1024x768x24 &
-sleep 5
 
 SERVER_ARGS="-batchmode -nographics $EXTRA_ARGS"
 wine "Risk of Rain 2.exe" $SERVER_ARGS &
 WINE_PID=$!
 
-LOG_PATH="/root/.wine/drive_c/users/root/AppData/LocalLow/Hopoo Games, LLC/Risk of Rain 2/Player.log"
 echo "Waiting for log file at: $LOG_PATH"
 
 while [ ! -f "$LOG_PATH" ]; do
-    if ! kill -0 $WINE_PID 2>/dev/null; then
+    if ! kill -0 "$WINE_PID" 2>/dev/null; then
         echo "Wine process died before creating log file"
         exit 1
     fi
@@ -70,4 +97,13 @@ while [ ! -f "$LOG_PATH" ]; do
 done
 
 echo "Log file found, tailing output..."
-tail -f "$LOG_PATH"
+tail -n +1 -F "$LOG_PATH" &
+TAIL_PID=$!
+
+set +e
+wait "$WINE_PID"
+WINE_EXIT=$?
+set -e
+
+echo "Wine process exited with code $WINE_EXIT"
+exit "$WINE_EXIT"
