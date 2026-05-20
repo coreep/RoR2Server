@@ -1,7 +1,7 @@
 services:
   ror2-server:
     build: .
-    container_name: ror2-dedicated-server
+    container_name: ror2-server
     restart: unless-stopped
     ports:
       - "${PORT:-27015}:${PORT:-27015}/udp"

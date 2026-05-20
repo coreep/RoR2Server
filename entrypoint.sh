@@ -79,6 +79,8 @@ fi
 echo "Processing configuration..."
 mkdir -p "$CONFIG_DIR"
 envsubst < /app/config.cfg > "$CONFIG_DIR/server.cfg"
+cp -f "$CONFIG_DIR/server.cfg" "$CONFIG_DIR/config.cfg"
+cp -f "$CONFIG_DIR/server.cfg" "$CONFIG_DIR/server_startup.cfg"
 
 export DISPLAY=:99
 Xvfb "$DISPLAY" -screen 0 1024x768x24 &
