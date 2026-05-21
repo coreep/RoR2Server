@@ -67,3 +67,9 @@ docker compose down
 To connect to the server:
 1. Open the in-game console by pressing ``Ctrl+Alt+` ``
 2. Type: `connect "YOUR_IP:PORT"`
+
+## What about mods?
+
+Client-side mods are working fine. But sever-side mods are not yet supported.
+
+You can find more information at [this issue](https://github.com/coreep/RoR2Server/issues/1). Any help is appreciated 🙌

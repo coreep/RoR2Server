@@ -1,11 +1,63 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 GAME_DIR="/game"
 ROR2_DLL_PATH="${GAME_DIR}/Risk of Rain 2_Data/Managed/RoR2.dll"
 BACKUP_PATH="${ROR2_DLL_PATH}.bak"
 PATCHED_DLL="RoR2_Patched.dll"
 CONFIG_DIR="${GAME_DIR}/Risk of Rain 2_Data/Config"
+LOG_PATH="/root/.wine/drive_c/users/root/AppData/LocalLow/Hopoo Games, LLC/Risk of Rain 2/Player.log"
+WINEPREFIX="${WINEPREFIX:-/root/.wine}"
+WINHTTP_DLL_PATH="${GAME_DIR}/winhttp.dll"
+
+XVFB_PID=""
+WINE_PID=""
+TAIL_PID=""
+
+cleanup() {
+    if [ -n "${TAIL_PID}" ] && kill -0 "${TAIL_PID}" 2>/dev/null; then
+        kill "${TAIL_PID}" 2>/dev/null || true
+        wait "${TAIL_PID}" 2>/dev/null || true
+    fi
+    if [ -n "${XVFB_PID}" ] && kill -0 "${XVFB_PID}" 2>/dev/null; then
+        kill "${XVFB_PID}" 2>/dev/null || true
+        wait "${XVFB_PID}" 2>/dev/null || true
+    fi
+}
+
+trap cleanup EXIT
+
+init_wine_prefix() {
+    echo "Initializing Wine prefix at $WINEPREFIX"
+    mkdir -p "$WINEPREFIX"
+
+    if ! wineboot -u >/tmp/wineboot.log 2>&1; then
+        echo "Wine prefix init failed, recreating prefix and retrying..."
+        rm -rf "$WINEPREFIX"
+        mkdir -p "$WINEPREFIX"
+        if ! wineboot -u >/tmp/wineboot.log 2>&1; then
+            echo "ERROR: wineboot failed after retry"
+            sed -n '1,120p' /tmp/wineboot.log
+            exit 1
+        fi
+    fi
+}
+
+configure_native_winhttp() {
+    if [ ! -f "$WINHTTP_DLL_PATH" ]; then
+        return
+    fi
+
+    echo "Found custom winhttp.dll at $WINHTTP_DLL_PATH, enabling native override"
+    cp -f "$WINHTTP_DLL_PATH" "$WINEPREFIX/drive_c/windows/system32/winhttp.dll"
+
+    if [ -d "$WINEPREFIX/drive_c/windows/syswow64" ]; then
+        cp -f "$WINHTTP_DLL_PATH" "$WINEPREFIX/drive_c/windows/syswow64/winhttp.dll" || true
+    fi
+
+    export WINEDLLOVERRIDES="winhttp=n,b${WINEDLLOVERRIDES:+;$WINEDLLOVERRIDES}"
+    wine reg add "HKCU\\Software\\Wine\\DllOverrides" /v winhttp /d native,builtin /f >/dev/null 2>&1 || true
+}
 
 echo "Risk of Rain 2 Dedicated Server Starting..."
 
@@ -20,21 +72,21 @@ if [ ! -f "$ROR2_DLL_PATH" ]; then
     exit 1
 fi
 
-cp -f /tmp/steamworks_sdk/*64.dll "${GAME_DIR}/" 2>/dev/null || true
+cp -f /steamworks_sdk/*64.dll "${GAME_DIR}/" 2>/dev/null || true
 
 if [ ! -f "$BACKUP_PATH" ]; then
     echo "Backup not found. Patching RoR2.dll..."
-    
+
     cp "$ROR2_DLL_PATH" "$BACKUP_PATH"
     echo "Created backup: $BACKUP_PATH"
-    
+
     echo "Building patcher..."
     cd /app/RoR2Patcher
     dotnet build -c Release
-    
+
     echo "Running patcher..."
     dotnet run -c Release -- --input "$ROR2_DLL_PATH" --output "/app/$PATCHED_DLL"
-    
+
     cp "/app/$PATCHED_DLL" "$ROR2_DLL_PATH"
     echo "Applied patch to RoR2.dll"
 else
@@ -44,25 +96,45 @@ fi
 echo "Processing configuration..."
 mkdir -p "$CONFIG_DIR"
 envsubst < /app/config.cfg > "$CONFIG_DIR/server.cfg"
+cp -f "$CONFIG_DIR/server.cfg" "$CONFIG_DIR/config.cfg"
+cp -f "$CONFIG_DIR/server.cfg" "$CONFIG_DIR/server_startup.cfg"
 
-winecfg
+export DISPLAY=:99
+Xvfb "$DISPLAY" -screen 0 1024x768x24 &
+XVFB_PID=$!
+export WINEPREFIX
+
+for _ in {1..20}; do
+    if [ -S "/tmp/.X11-unix/X99" ]; then
+        break
+    fi
+    sleep 1
+done
+
+if [ ! -S "/tmp/.X11-unix/X99" ]; then
+    echo "ERROR: Xvfb did not start on DISPLAY $DISPLAY"
+    exit 1
+fi
+
+if [ ! -f "$WINEPREFIX/drive_c/windows/system32/kernel32.dll" ]; then
+    echo "Wine prefix is missing kernel32.dll, recreating prefix"
+    rm -rf "$WINEPREFIX"
+fi
+
+init_wine_prefix
+configure_native_winhttp
 
 cd "$GAME_DIR"
 echo "Starting Risk of Rain 2 Dedicated Server..."
-
-export DISPLAY=:99
-Xvfb :99 -screen 0 1024x768x24 &
-sleep 5
 
 SERVER_ARGS="-batchmode -nographics $EXTRA_ARGS"
 wine "Risk of Rain 2.exe" $SERVER_ARGS &
 WINE_PID=$!
 
-LOG_PATH="/root/.wine/drive_c/users/root/AppData/LocalLow/Hopoo Games, LLC/Risk of Rain 2/Player.log"
 echo "Waiting for log file at: $LOG_PATH"
 
 while [ ! -f "$LOG_PATH" ]; do
-    if ! kill -0 $WINE_PID 2>/dev/null; then
+    if ! kill -0 "$WINE_PID" 2>/dev/null; then
         echo "Wine process died before creating log file"
         exit 1
     fi
@@ -70,4 +142,13 @@ while [ ! -f "$LOG_PATH" ]; do
 done
 
 echo "Log file found, tailing output..."
-tail -f "$LOG_PATH"
+tail -n +1 -F "$LOG_PATH" &
+TAIL_PID=$!
+
+set +e
+wait "$WINE_PID"
+WINE_EXIT=$?
+set -e
+
+echo "Wine process exited with code $WINE_EXIT"
+exit "$WINE_EXIT"
