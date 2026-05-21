@@ -70,5 +70,6 @@ To connect to the server:
 
 ## What about mods?
 
-Sadly, mods are not yet supported.
-You can find more information at [this issue](https://github.com/EPecherkin/RoR2Server/issues/1). Any help is appreciated. 🙌
+Client-side mods are working fine. But sever-side mods are not yet supported.
+
+You can find more information at [this issue](https://github.com/EPecherkin/RoR2Server/issues/1). Any help is appreciated 🙌

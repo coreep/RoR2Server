@@ -298,7 +298,7 @@ namespace RoR2DedicatedPatcher
 
         static void PatchVersionCheck(AssemblyDefinition assembly)
         {
-            Console.WriteLine("Patching version check to accept client version 1.3.9...");
+            Console.WriteLine("Patching version check to accept client version 1.4.1...");
 
             var serverAuthManager = assembly.MainModule.Types.FirstOrDefault(t => t.FullName == "RoR2.Networking.ServerAuthManager");
             var handleSetClientAuth = serverAuthManager.Methods.FirstOrDefault(m => m.Name == "HandleSetClientAuth");
@@ -310,9 +310,9 @@ namespace RoR2DedicatedPatcher
             {
                 if (instructions[i].OpCode == OpCodes.Call && instructions[i].Operand?.ToString().Contains("GetBuildId") == true)
                 {
-                    // Replace call to GetBuildId with ldstr "1.3.9"
-                    processor.Replace(instructions[i], processor.Create(OpCodes.Ldstr, "1.3.9"));
-                    Console.WriteLine("Patched version check to use 1.3.9");
+                    // Replace call to GetBuildId with ldstr "1.4.1"
+                    processor.Replace(instructions[i], processor.Create(OpCodes.Ldstr, "1.4.1"));
+                    Console.WriteLine("Patched version check to use 1.4.1");
                     break;
                 }
             }
