@@ -1,10 +1,10 @@
-Risk of Rain 2/
 RoR2Patcher/bin/
 RoR2Patcher/obj/
 RefCode/
+!output/.keep
 output/
-game/
-logs*
+Risk of Rain 2/
+mods/
 
 # Development files
 Dockerfile.dev

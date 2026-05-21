@@ -76,17 +76,17 @@ cp -f /tmp/steamworks_sdk/*64.dll "${GAME_DIR}/" 2>/dev/null || true
 
 if [ ! -f "$BACKUP_PATH" ]; then
     echo "Backup not found. Patching RoR2.dll..."
-    
+
     cp "$ROR2_DLL_PATH" "$BACKUP_PATH"
     echo "Created backup: $BACKUP_PATH"
-    
+
     echo "Building patcher..."
     cd /app/RoR2Patcher
     dotnet build -c Release
-    
+
     echo "Running patcher..."
     dotnet run -c Release -- --input "$ROR2_DLL_PATH" --output "/app/$PATCHED_DLL"
-    
+
     cp "/app/$PATCHED_DLL" "$ROR2_DLL_PATH"
     echo "Applied patch to RoR2.dll"
 else
@@ -122,7 +122,7 @@ if [ ! -f "$WINEPREFIX/drive_c/windows/system32/kernel32.dll" ]; then
 fi
 
 init_wine_prefix
-# configure_native_winhttp
+configure_native_winhttp
 
 cd "$GAME_DIR"
 echo "Starting Risk of Rain 2 Dedicated Server..."
