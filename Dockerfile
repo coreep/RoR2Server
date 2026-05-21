@@ -9,10 +9,12 @@ RUN apt-get update && apt-get install -y \
 
 RUN mkdir -p /steamworks_sdk && steamcmd +force_install_dir /steamworks_sdk +login anonymous +@sSteamCmdForcePlatformType windows +app_update 1007 +quit
 
-WORKDIR /app
-
+# To reduce image size and speed up builds, it is advised to to mount /game/ folder from the host machine.
+# IMPORTANT: it is NOT an option for WSL hosts, since it breaks wine. On WSL, you have to build /game/ into the image.
 COPY ["Risk of Rain 2/", "/game/"]
 COPY mods/ /game/
+
+WORKDIR /app
 COPY RoR2Patcher/ /app/RoR2Patcher/
 COPY config.cfg /app/config.cfg
 
